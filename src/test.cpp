@@ -16,12 +16,53 @@
 #include "dobot_msgs/SetCPCmd.h"
 #include "dobot_msgs/SetCPParams.h"
 
-#include "sensor_msgs/PointCloud2.h"
-
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/common/geometry.h>
+
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/PointCloud2.h>
+
+
+#define B_MAX 100
+#define B_MIN 0
+#define G_MAX 100
+#define G_MIN 0
+#define R_MAX 255
+#define R_MIN 100
+
+using namespace sensor_msgs;
+using namespace message_filters;
+
+int detection_ = false;
+pcl::PointCloud<pcl::PointXYZ> detection_points_; 
+
+void callback(const ImageConstPtr& image, const PointCloud2ConstPtr& point_cloud)
+{
+  cv_bridge::CvImagePtr cv_ptr;
+  try
+  {
+    cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+  }
+  catch (cv_bridge::Exception& e)
+  {
+    ROS_ERROR("cv_bridge exception: %s", e.what());
+    return;
+  }
+
+  cv::Mat bin_image;
+
+	Scalar s_min = Scalar(B_MIN, G_MIN, R_MIN);
+	Scalar s_max = Scalar(B_MAX, G_MAX, R_MAX);
+	inRange(cv_ptr->image, s_min, s_max, bin_image);
+
+  imshow("input image", cv_ptr->image);
+  imshow("bin image", bin_image);
+	waitKey(0);
+}
 
 int main(int argc, char **argv)
 {
@@ -70,8 +111,7 @@ int main(int argc, char **argv)
     // Set PTP joint parameters
     do {
         client = n.serviceClient<dobot_msgs::SetPTPJointParams>("/DobotServer/SetPTPJointParams");
-        dobot_msgs::SetPTPJointParams srv;
-
+        dobot_msgs::SetPTPJointParams srv; 
         for (int i = 0; i < 4; i++) {
             srv.request.velocity.push_back(100);
         }
@@ -123,20 +163,19 @@ int main(int argc, char **argv)
     srv.request.r = 0;
     std::cout << "move home pos: " << client.call(srv) << std::endl;
 
-    
-    SpringPointGetter spg;
-    spg.start();
+    //detection
+    message_filters::Subscriber<Image> image_sub(n, "image_raw", 1);
+    message_filters::Subscriber<PointCloud2> point_cloud_sub(n, "depth/ponits", 1);
+    TimeSynchronizer<Image, PointCloud2> sync(image_sub, point_cloud_sub, 10);
+    sync.registerCallback(boost::bind(&callback, _1, _2));
+
     ros::Rate r(10);
-    while(ros::ok())
+    while(!detection_)
     {
-      pcl::PointXYZ p;
-      spg.select_best_point(p);
       ros::spinOnce();
       r.sleep();
     }
 
     return 0;
 }
-
-
 

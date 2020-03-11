@@ -42,3 +42,8 @@ target_link_libraries(coordinate_transformer
   ${catkin_LIBRARIES}
 )
 add_dependencies(coordinate_transformer coordinate_transformer_gencpp)
+
+add_executable(test src/test.cpp)
+target_link_libraries(test
+  ${catkin_LIBRARIES}
+)

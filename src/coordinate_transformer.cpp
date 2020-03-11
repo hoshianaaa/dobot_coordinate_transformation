@@ -1,17 +1,5 @@
 #include "ros/ros.h"
-//#include "dobot_coordinate_transformer/CameraCoordinate.h"
 #include "dobot_coordinate_transformer/CameraCoordinate.h"
-
-/*
-bool add(beginner_tutorials::AddTwoInts::Request  &req,
-         beginner_tutorials::AddTwoInts::Response &res)
-{
-  res.sum = req.a + req.b;
-  ROS_INFO("request: x=%ld, y=%ld", (long int)req.a, (long int)req.b);
-  ROS_INFO("sending back response: [%ld]", (long int)res.sum);
-  return true;
-}
-*/
 
 bool coordinate_transform(dobot_coordinate_transformer::CameraCoordinate::Request  &req,
                           dobot_coordinate_transformer::CameraCoordinate::Response &res)
