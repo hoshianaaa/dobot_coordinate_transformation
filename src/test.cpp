@@ -26,6 +26,10 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 
+#include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 #define B_MAX 100
 #define B_MIN 0
@@ -33,6 +37,12 @@
 #define G_MIN 0
 #define R_MAX 255
 #define R_MIN 100
+
+#define AREA_MAX 10000
+#define AREA_MIN 100
+
+const int image_width_ = 640;
+const int image_height_ = 480;
 
 using namespace sensor_msgs;
 using namespace message_filters;
@@ -45,7 +55,7 @@ void callback(const ImageConstPtr& image, const PointCloud2ConstPtr& point_cloud
   cv_bridge::CvImagePtr cv_ptr;
   try
   {
-    cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+    cv_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
   }
   catch (cv_bridge::Exception& e)
   {
@@ -53,15 +63,51 @@ void callback(const ImageConstPtr& image, const PointCloud2ConstPtr& point_cloud
     return;
   }
 
-  cv::Mat bin_image;
+  cv::Mat binImg;
 
-	Scalar s_min = Scalar(B_MIN, G_MIN, R_MIN);
-	Scalar s_max = Scalar(B_MAX, G_MAX, R_MAX);
-	inRange(cv_ptr->image, s_min, s_max, bin_image);
+	cv::Scalar s_min = cv::Scalar(B_MIN, G_MIN, R_MIN);
+	cv::Scalar s_max = cv::Scalar(B_MAX, G_MAX, R_MAX);
+	inRange(cv_ptr->image, s_min, s_max, binImg);
 
   imshow("input image", cv_ptr->image);
-  imshow("bin image", bin_image);
-	waitKey(0);
+  imshow("bin image", binImg);
+	cv::waitKey(0);
+
+  cv::Mat stats;
+  cv::Mat centroids;
+  cv::Mat labelImg;
+  std::vector<int> detection_labels;
+  int nLab = cv::connectedComponentsWithStats(binImg, labelImg, stats, centroids);
+
+ for (int i = 1; i < nLab; ++i) {
+      int *param = stats.ptr<int>(i);
+      int area = param[cv::ConnectedComponentsTypes::CC_STAT_AREA];
+
+      if ( area > AREA_MIN && area < AREA_MAX)
+      {
+        detection_labels.push_back(i);
+      }
+  }
+
+  std::vector<cv::Point2d> detection_2d_poses;
+  for (int i=0;i<detection_labels.size();++i)
+  {
+    double *param = centroids.ptr<double>(i);
+    int x = static_cast<int>(param[0]);
+    int y = static_cast<int>(param[1]);
+    detection_2d_poses.push_back(cv::Point2d(x,y));
+  }
+
+  pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+  pcl::fromROSMsg(*point_cloud, pcl_cloud);
+  for (int i=0;i<detection_2d_poses.size();++i)
+  {
+    int x = detection_2d_poses[i].x;
+    int y = detection_2d_poses[i].y;
+    detection_points_.push_back(pcl_cloud[image_width_ * y + x]); 
+  }
+
+  std::cout << "detection points size:" << detection_points_.size() << std::endl;
 }
 
 int main(int argc, char **argv)
@@ -78,7 +124,7 @@ int main(int argc, char **argv)
     if (client.call(srv1) == false) {
         ROS_ERROR("Failed to call SetCmdTimeout. Maybe DobotServer isn't started yet!");
         return -1;
-    }
+  }
 
     // Clear the command queue
     client = n.serviceClient<dobot_msgs::SetQueuedCmdClear>("/DobotServer/SetQueuedCmdClear");

@@ -16,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
+find_package(OpenCV REQUIRED)
+
 add_service_files(
   FILES
   CameraCoordinate.srv
@@ -46,4 +48,5 @@ add_dependencies(coordinate_transformer coordinate_transformer_gencpp)
 add_executable(test src/test.cpp)
 target_link_libraries(test
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
 )
