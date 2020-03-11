@@ -18,6 +18,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  dobot_msgs
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -61,11 +63,12 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
+add_service_files(
+  FILES
+  CameraCoordinate.srv
 #   Service1.srv
 #   Service2.srv
-# )
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -75,10 +78,10 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
+generate_messages(
+  DEPENDENCIES
 #   geometry_msgs#   sensor_msgs#   std_msgs
-# )
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -110,10 +113,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES dobot_coordinate_transformer
-#  CATKIN_DEPENDS cv_bridge dynamic_reconfigure geometry_msgs image_transport pcl_ros roscpp rospy rospy sensor_msgs std_msgs
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES dobot_coordinate_transformer
+  CATKIN_DEPENDS cv_bridge dynamic_reconfigure geometry_msgs image_transport pcl_ros roscpp rospy rospy sensor_msgs std_msgs
+  DEPENDS system_lib
 )
 
 ###########
@@ -123,7 +126,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -135,7 +138,6 @@ include_directories(
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
@@ -153,9 +155,12 @@ include_directories(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
+
+add_executable(coordinate_transformer src/coordinate_transformer.cpp)
+target_link_libraries(coordinate_transformer
+  ${catkin_LIBRARIES}
+)
+add_dependencies(coordinate_transformer coordinate_transformer_gencpp)
 
 #############
 ## Install ##
