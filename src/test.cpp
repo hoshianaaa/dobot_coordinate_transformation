@@ -31,6 +31,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include "dobot_coordinate_transformer/CameraCoordinate.h"
+
 #define B_MAX 100
 #define B_MIN 0
 #define G_MAX 100
@@ -50,66 +52,92 @@ using namespace message_filters;
 int detection_ = false;
 pcl::PointCloud<pcl::PointXYZ> detection_points_; 
 
-void callback(const ImageConstPtr& image, const PointCloud2ConstPtr& point_cloud)
+class RedPlateDetector
 {
-  cv_bridge::CvImagePtr cv_ptr;
-  try
+public:
+  RedPlateDetector():sync2(image_sub,point_cloud_sub, 10)
   {
-    cv_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
+    image_sub.subscribe(n, "/camera/color/image_raw", 1);
+    point_cloud_sub.subscribe(n, "/points", 1);
+    sync2.registerCallback(boost::bind(&RedPlateDetector::callback,this, _1, _2));
+    point_cloud_pub = n.advertise<sensor_msgs::PointCloud2>("", 50);
   }
-  catch (cv_bridge::Exception& e)
+
+  void callback(const ImageConstPtr& image, const PointCloud2ConstPtr& point_cloud)
   {
-    ROS_ERROR("cv_bridge exception: %s", e.what());
-    return;
+    cv_bridge::CvImagePtr cv_ptr;
+    try
+    {
+      cv_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
+    }
+    catch (cv_bridge::Exception& e)
+    {
+      ROS_ERROR("cv_bridge exception: %s", e.what());
+      return;
+    }
+
+    cv::Mat binImg;
+
+    cv::Scalar s_min = cv::Scalar(B_MIN, G_MIN, R_MIN);
+    cv::Scalar s_max = cv::Scalar(B_MAX, G_MAX, R_MAX);
+    inRange(cv_ptr->image, s_min, s_max, binImg);
+
+    imshow("input image", cv_ptr->image);
+    imshow("bin image", binImg);
+    cv::waitKey(0);
+
+    cv::Mat stats;
+    cv::Mat centroids;
+    cv::Mat labelImg;
+    std::vector<int> detection_labels;
+    int nLab = cv::connectedComponentsWithStats(binImg, labelImg, stats, centroids);
+
+   for (int i = 1; i < nLab; ++i) {
+        int *param = stats.ptr<int>(i);
+        int area = param[cv::ConnectedComponentsTypes::CC_STAT_AREA];
+
+        if ( area > AREA_MIN && area < AREA_MAX)
+        {
+          detection_labels.push_back(i);
+        }
+    }
+
+    std::vector<cv::Point2d> detection_2d_poses;
+    for (int i=0;i<detection_labels.size();++i)
+    {
+      double *param = centroids.ptr<double>(i);
+      int x = static_cast<int>(param[0]);
+      int y = static_cast<int>(param[1]);
+      detection_2d_poses.push_back(cv::Point2d(x,y));
+    }
+
+    pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+    pcl::fromROSMsg(*point_cloud, pcl_cloud);
+    for (int i=0;i<detection_2d_poses.size();++i)
+    {
+      int x = detection_2d_poses[i].x;
+      int y = detection_2d_poses[i].y;
+      detection_points_.push_back(pcl_cloud[image_width_ * y + x]); 
+    }
+    std::cout << "detection points size:" << detection_points_.size() << std::endl;
+
+    sensor_msgs::PointCloud2 ros_cloud;
+    pcl::toROSMsg(detection_points_, ros_cloud);
+    ros_cloud.header.frame_id = "camera";
+
+    point_cloud_pub.publish(ros_cloud);
+
+    detection_ = true;
   }
 
-  cv::Mat binImg;
+private:
+  ros::NodeHandle n;
+  ros::Publisher point_cloud_pub;
+  message_filters::Subscriber<sensor_msgs::Image> image_sub;
+  message_filters::Subscriber<sensor_msgs::PointCloud2> point_cloud_sub;
+  TimeSynchronizer<Image, PointCloud2> sync2;
 
-	cv::Scalar s_min = cv::Scalar(B_MIN, G_MIN, R_MIN);
-	cv::Scalar s_max = cv::Scalar(B_MAX, G_MAX, R_MAX);
-	inRange(cv_ptr->image, s_min, s_max, binImg);
-
-  imshow("input image", cv_ptr->image);
-  imshow("bin image", binImg);
-	cv::waitKey(0);
-
-  cv::Mat stats;
-  cv::Mat centroids;
-  cv::Mat labelImg;
-  std::vector<int> detection_labels;
-  int nLab = cv::connectedComponentsWithStats(binImg, labelImg, stats, centroids);
-
- for (int i = 1; i < nLab; ++i) {
-      int *param = stats.ptr<int>(i);
-      int area = param[cv::ConnectedComponentsTypes::CC_STAT_AREA];
-
-      if ( area > AREA_MIN && area < AREA_MAX)
-      {
-        detection_labels.push_back(i);
-      }
-  }
-
-  std::vector<cv::Point2d> detection_2d_poses;
-  for (int i=0;i<detection_labels.size();++i)
-  {
-    double *param = centroids.ptr<double>(i);
-    int x = static_cast<int>(param[0]);
-    int y = static_cast<int>(param[1]);
-    detection_2d_poses.push_back(cv::Point2d(x,y));
-  }
-
-  pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
-  pcl::fromROSMsg(*point_cloud, pcl_cloud);
-  for (int i=0;i<detection_2d_poses.size();++i)
-  {
-    int x = detection_2d_poses[i].x;
-    int y = detection_2d_poses[i].y;
-    detection_points_.push_back(pcl_cloud[image_width_ * y + x]); 
-  }
-
-  std::cout << "detection points size:" << detection_points_.size() << std::endl;
-}
-
+};
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test");
@@ -207,14 +235,9 @@ int main(int argc, char **argv)
     srv.request.y = -200;
     srv.request.z = 0;
     srv.request.r = 0;
-    std::cout << "move home pos: " << client.call(srv) << std::endl;
+    client.call(srv);
 
-    //detection
-    message_filters::Subscriber<Image> image_sub(n, "image_raw", 1);
-    message_filters::Subscriber<PointCloud2> point_cloud_sub(n, "depth/ponits", 1);
-    TimeSynchronizer<Image, PointCloud2> sync(image_sub, point_cloud_sub, 10);
-    sync.registerCallback(boost::bind(&callback, _1, _2));
-
+    RedPlateDetector rpd;
     ros::Rate r(10);
     while(!detection_)
     {
@@ -222,6 +245,28 @@ int main(int argc, char **argv)
       r.sleep();
     }
 
+    ros::ServiceClient coordinate_transformer_client = n.serviceClient<dobot_coordinate_transformer::CameraCoordinate>("coordinate_transform");
+    for(int i=0;i<detection_points_.size();++i)
+    { 
+      dobot_coordinate_transformer::CameraCoordinate coordinate_srv;
+      coordinate_srv.request.camera_x = detection_points_[i].x;
+      coordinate_srv.request.camera_y = detection_points_[i].y;
+      coordinate_srv.request.camera_z = detection_points_[i].z;
+      coordinate_transformer_client.call(coordinate_srv);
+
+      double x = coordinate_srv.response.dobot_x;
+      double y = coordinate_srv.response.dobot_y;
+      double z = coordinate_srv.response.dobot_z;
+
+      std::cout << "x:" << x << " y:" << y << " z:" << z << std::endl;
+
+      srv.request.ptpMode = 1;
+      srv.request.x = x;
+      srv.request.y = y;
+      srv.request.z = z;
+      srv.request.r = 0;
+      client.call(srv);
+    }
     return 0;
 }
 
