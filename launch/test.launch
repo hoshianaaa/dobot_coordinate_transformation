@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="dobot_coordinate_transformer" type="coordinate_transformer" name="coordinate_transformer" output="log"/>
+  <node pkg="dobot_coordinate_transformer" type="test" name="test" output="log"/>
+  <include file="$(find astra_camera)/launch/stereo_s.launch"/>
+</launch>

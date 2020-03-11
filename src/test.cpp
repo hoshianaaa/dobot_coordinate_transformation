@@ -46,6 +46,11 @@
 const int image_width_ = 640;
 const int image_height_ = 480;
 
+std::string camera_frame_ = "";
+std::string image_topic_ = "";
+std::string camera_points_topic_ = "";
+std::string point_cloud_topic_ = "";
+
 using namespace sensor_msgs;
 using namespace message_filters;
 
@@ -57,10 +62,10 @@ class RedPlateDetector
 public:
   RedPlateDetector():sync2(image_sub,point_cloud_sub, 10)
   {
-    image_sub.subscribe(n, "/camera/color/image_raw", 1);
-    point_cloud_sub.subscribe(n, "/points", 1);
+    image_sub.subscribe(n, image_topic_, 1);
+    point_cloud_sub.subscribe(n, camera_points_topic_, 1);
     sync2.registerCallback(boost::bind(&RedPlateDetector::callback,this, _1, _2));
-    point_cloud_pub = n.advertise<sensor_msgs::PointCloud2>("", 50);
+    point_cloud_pub = n.advertise<sensor_msgs::PointCloud2>(point_cloud_topic_, 50);
   }
 
   void callback(const ImageConstPtr& image, const PointCloud2ConstPtr& point_cloud)
@@ -123,7 +128,7 @@ public:
 
     sensor_msgs::PointCloud2 ros_cloud;
     pcl::toROSMsg(detection_points_, ros_cloud);
-    ros_cloud.header.frame_id = "camera";
+    ros_cloud.header.frame_id = camera_frame_;
 
     point_cloud_pub.publish(ros_cloud);
 
