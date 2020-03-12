@@ -31,8 +31,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-#include "dobot_coordinate_transformer/CameraCoordinate.h"
-
 #define B_MAX 100
 #define B_MIN 0
 #define G_MAX 100
@@ -250,27 +248,16 @@ int main(int argc, char **argv)
       r.sleep();
     }
 
-    ros::ServiceClient coordinate_transformer_client = n.serviceClient<dobot_coordinate_transformer::CameraCoordinate>("coordinate_transform");
     for(int i=0;i<detection_points_.size();++i)
     { 
-      dobot_coordinate_transformer::CameraCoordinate coordinate_srv;
-      coordinate_srv.request.camera_x = detection_points_[i].x;
-      coordinate_srv.request.camera_y = detection_points_[i].y;
-      coordinate_srv.request.camera_z = detection_points_[i].z;
-      coordinate_transformer_client.call(coordinate_srv);
-
-      double x = coordinate_srv.response.dobot_x;
-      double y = coordinate_srv.response.dobot_y;
-      double z = coordinate_srv.response.dobot_z;
-
-      std::cout << "x:" << x << " y:" << y << " z:" << z << std::endl;
-
+      /*
       srv.request.ptpMode = 1;
       srv.request.x = x;
       srv.request.y = y;
       srv.request.z = z;
       srv.request.r = 0;
       client.call(srv);
+      */
     }
     return 0;
 }

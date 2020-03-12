@@ -1,9 +1,0 @@
-float32 camera_x
-float32 camera_y
-float32 camera_z
-float32 camera_t
----
-float32 dobot_x
-float32 dobot_y
-float32 dobot_z
-float32 dobot_t

@@ -13,19 +13,11 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   dobot_msgs
-  message_generation
+  tf
 )
 
 find_package(OpenCV REQUIRED)
 
-add_service_files(
-  FILES
-  CameraCoordinate.srv
-)
-
-generate_messages(
-  DEPENDENCIES
-)
 
 catkin_package(
   INCLUDE_DIRS include
