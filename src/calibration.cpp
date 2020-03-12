@@ -31,6 +31,9 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <tf/transform_listener.h>
+#include <pcl_ros/transforms.h>
+
 #define B_MAX 100
 #define B_MIN 0
 #define G_MAX 100
@@ -126,8 +129,11 @@ public:
       int y = static_cast<int>(param[1]);
       detection_2d_pos = cv::Point2d(x,y);
 
+      sensor_msgs::PointCloud2 point_cloud_transformed;
+      pcl_ros::transformPointCloud("base_link", transform, *point_cloud, point_cloud_transformed);
+      
       pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
-      pcl::fromROSMsg(*point_cloud, pcl_cloud);
+      pcl::fromROSMsg(point_cloud_transformed, pcl_cloud);
       x = detection_2d_pos.x;
       y = detection_2d_pos.y;
       detection_point_ = pcl_cloud[image_width_ * y + x]; 
@@ -143,6 +149,7 @@ private:
   pcl::PointXYZ detection_point_;
   bool detection_;
   bool enable_;
+  tf::StampedTransform transform;
 
 };
 
