@@ -14,9 +14,16 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   dobot_msgs
   tf
+  dynamic_reconfigure
 )
 
 find_package(OpenCV REQUIRED)
+
+generate_dynamic_reconfigure_options(
+  cfg/config.cfg
+)
+
+
 
 
 catkin_package(
@@ -42,3 +49,17 @@ target_link_libraries(test
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
+
+add_executable(calibration src/calibration.cpp)
+target_link_libraries(calibration
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+add_executable(color_detection src/color_detection.cpp)
+add_dependencies(color_detection dobot_coordinate_transformer_gencfg) #(ROSパッケージ名)_gencfgという名前で追加
+target_link_libraries(color_detection
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
